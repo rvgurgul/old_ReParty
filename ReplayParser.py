@@ -105,34 +105,7 @@ class ReplayParser:
             missions_c=0x50
         )
     }
-    __LEVEL_MAP = {
-        endian_swap(0x26C3303A): "High-rise",
-        endian_swap(0xAAFA9659): "Ballroom",
-        endian_swap(0x2519125B): "Ballroom",
-        endian_swap(0xA1C5561A): "High-rise",
-        endian_swap(0x5EAAB328): "Old Gallery",
-        endian_swap(0x750C0A29): "Old Courtyard 2",
-        endian_swap(0x83F59536): "Panopticon",
-        endian_swap(0x91A0BEA8): "Old Veranda",
-        endian_swap(0xBC1F89B8): "Old Balcony",
-        endian_swap(0x4073020D): "Pub",
-        endian_swap(0xF3FF853B): "Pub",
-        endian_swap(0xB0E7C209): "Old Ballroom",
-        endian_swap(0x6B68CFB4): "Old Courtyard",
-        endian_swap(0x8FE37670): "Double Modern",
-        endian_swap(0x206114E6): "Modern",
-        0x6f81a558: "Veranda",
-        0x9dc5bb5e: "Courtyard",
-        0x168f4f62: "Library",
-        0x1dbd8e41: "Balcony",
-        0x7173b8bf: "Gallery",
-        0x9032ce22: "Terrace",
-        0x2e37f15b: "Moderne",
-        0x79dfa0cf: "Teien",
-        0x98e45d99: "Aquarium",
-        0x35ac5135: "Redwoods",
-        0xf3e61461: "Modern"
-    }
+    __VENUE_MAP = None
     __VARIANT_MAP = {
         "Teien": [
             "BooksBooksBooks",
@@ -161,6 +134,36 @@ class ReplayParser:
         1: "p",
         2: "a"
     }
+
+    def __init__(self):
+        self.__VENUE_MAP = {
+            self.endian_swap(0x26C3303A): "High-rise",
+            self.endian_swap(0xAAFA9659): "Ballroom",
+            self.endian_swap(0x2519125B): "Ballroom",
+            self.endian_swap(0xA1C5561A): "High-rise",
+            self.endian_swap(0x5EAAB328): "Old Gallery",
+            self.endian_swap(0x750C0A29): "Old Courtyard 2",
+            self.endian_swap(0x83F59536): "Panopticon",
+            self.endian_swap(0x91A0BEA8): "Old Veranda",
+            self.endian_swap(0xBC1F89B8): "Old Balcony",
+            self.endian_swap(0x4073020D): "Pub",
+            self.endian_swap(0xF3FF853B): "Pub",
+            self.endian_swap(0xB0E7C209): "Old Ballroom",
+            self.endian_swap(0x6B68CFB4): "Old Courtyard",
+            self.endian_swap(0x8FE37670): "Double Modern",
+            self.endian_swap(0x206114E6): "Modern",
+            0x6f81a558: "Veranda",
+            0x9dc5bb5e: "Courtyard",
+            0x168f4f62: "Library",
+            0x1dbd8e41: "Balcony",
+            0x7173b8bf: "Gallery",
+            0x9032ce22: "Terrace",
+            0x2e37f15b: "Moderne",
+            0x79dfa0cf: "Teien",
+            0x98e45d99: "Aquarium",
+            0x35ac5135: "Redwoods",
+            0xf3e61461: "Modern"
+        }
 
     def __unpack_missions(self, sector, offset):
         data = self.__unpack_int(sector, offset)
@@ -236,7 +239,7 @@ class ReplayParser:
             'spy_username': name_extracts[0], 'sniper_username': name_extracts[1],
             'spy_displayname': name_extracts[2], 'sniper_displayname': name_extracts[3],
             'result': self.__RESULT_MAP[self.__unpack_int(bytes_read, offsets.result)],
-            'venue': self.__LEVEL_MAP[self.__unpack_int(bytes_read, offsets.venue)],
+            'venue': self.__VENUE_MAP[self.__unpack_int(bytes_read, offsets.venue)],
             'selected_missions': self.__unpack_missions(bytes_read, offsets.missions_s),
             'picked_missions': self.__unpack_missions(bytes_read, offsets.missions_p),
             'completed_missions': self.__unpack_missions(bytes_read, offsets.missions_c),
