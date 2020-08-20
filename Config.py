@@ -2,30 +2,31 @@ import json
 import os
 
 class Config:
-    configs = {}
+    __configs = {}
+    __saved = {}
 
     def __init__(self, path, default_config=None, load_logging=False):
         self.path = path
         self.verbose = load_logging
         self.__default = default_config
-        if path not in self.configs:
+        if path not in self.__configs:
             if os.path.exists(path):
                 try:
                     with open(path, "r") as f:
-                        self.configs[path] = json.load(f)
+                        self.__configs[path] = json.load(f)
                         if self.verbose:
-                            print(f"reading config: {self.configs[self.path]}")
+                            print(f"reading config: {self.__configs[self.path]}")
                 except:
                     with open(path, "a") as f:
-                        self.configs[path] = default_config
-                        json.dump(self.configs[path], f)
+                        self.__configs[path] = default_config
+                        json.dump(self.__configs[path], f)
                         if self.verbose:
                             print("error reading config, using default:", default_config)
                 for key in default_config:  # Allows newer versions of configs to add properties
-                    if key not in self.configs[path]:
+                    if key not in self.__configs[path]:
                         if self.verbose:
                             print(f"+ added new property: '{key}': {default_config[key]}")
-                        self.configs[path][key] = default_config[key]
+                        self.__configs[path][key] = default_config[key]
                 # for key in self.configs[path]:
                 #     if key not in default_config:
                 #         if self.verbose:
@@ -34,38 +35,46 @@ class Config:
             else:
                 if self.verbose:
                     print("config not found, using default:", default_config)
-                self.configs[path] = default_config
+                self.__configs[path] = default_config
+        self.__saved[path] = True  # the config was just initialized, so there are no changes to be saved
 
     def save(self):
-        """built-in functions (such as open), do not work in __del__ for whatever reason"""
-        try:
-            with open(self.path, "w") as f:
-                json.dump(self.configs[self.path], f, indent=4)
-                if self.verbose:
-                    print("writing config:", self.configs[self.path])
-        except:
-            print("ERROR WHILE WRITING CONFIG???")
+        if not self.__saved[self.path]:
+            # built-in functions (such as open), do not work in __del__ for whatever reason, so
+            # this must be called manually
+            try:
+                with open(self.path, "w") as f:
+                    json.dump(self.__configs[self.path], f, indent=4)
+                    if self.verbose:
+                        print("writing config:", self.__configs[self.path])
+            except:
+                print("ERROR WHILE WRITING CONFIG???")
 
     def __getitem__(self, item):
-        return self.configs[self.path][item]
+        return self.__configs[self.path][item]
 
     def __setitem__(self, key, value):
         if key in self.__default:
-            self.configs[self.path][key] = value
+            self.__configs[self.path][key] = value
+            self.__saved[self.path] = False
 
     def __delitem__(self, key):
-        del self.configs[self.path][key]
+        del self.__configs[self.path][key]
+        self.__saved[self.path] = False
 
     def __str__(self):
-        return str(self.configs[self.path])
+        return str(self.__configs[self.path])
 
     def toggle(self, key):
-        if key in self.configs[self.path]:
-            val = self.configs[self.path][key]
+        if key in self.__configs[self.path]:
+            val = self.__configs[self.path][key]
             if type(val) == bool:
                 val = not val
-                self.configs[self.path][key] = val
+                self.__configs[self.path][key] = val
+                self.__saved[self.path] = False
                 return val
 
     def reset_to_defaults(self):
-        self.configs[self.path] = self.__default
+        self.__configs[self.path] = self.__default
+        self.__saved[self.path] = False
+
