@@ -1,224 +1,316 @@
-#!/usr/bin/env python
-
-import struct
-import datetime
-import base64
-
-from ReplayOffsets.ReplayVersion3Offsets import ReplayVersion3Offsets
-from ReplayOffsets.ReplayVersion4Offsets import ReplayVersion4Offsets
-from ReplayOffsets.ReplayVersion5Offsets import ReplayVersion5Offsets
-from ReplayOffsets.ReplayVersion6Offsets import ReplayVersion6Offsets
-
-FILE_VERSION = 3
-
-RESULT_MAP = {
-    0: "Missions Win",
-    1: "Time Out",
-    2: "Spy Shot",
-    3: "Civilian Shot",
-    4: "In Progress"
-}
-
-VARIANT_MAP = {
-    "Teien": [
-        "BooksBooksBooks",
-        "BooksStatuesBooks",
-        "StatuesBooksBooks",
-        "StatuesStatuesBooks",
-        "BooksBooksStatues",
-        "BooksStatuesStatues",
-        "StatuesBooksStatues",
-        "StatuesStatuesStatues"
-    ],
-    "Aquarium": ["Bottom", "Top"],
-}
-
-
-def endian_swap(value):
-    return struct.unpack("<I", struct.pack(">I", value))[0]
-
-
-# LOL: since level IDs are generated based on the hash of the level file, multiple
-#       ids will map to the same level.  This table is definitely incomplete
-LEVEL_MAP = {
-    endian_swap(0x26C3303A): "BvB High-Rise",
-    endian_swap(0xAAFA9659): "BvB (New Art) Ballroom",
-    endian_swap(0x2519125B): "Ballroom",
-    endian_swap(0xA1C5561A): "High-Rise",
-    endian_swap(0x5EAAB328): "Old Gallery",
-    endian_swap(0x750C0A29): "Courtyard 2",
-    endian_swap(0x83F59536): "Panopticon",
-    endian_swap(0x91A0BEA8): "Old Veranda",
-    endian_swap(0xBC1F89B8): "Old Balcony",
-    endian_swap(0x4073020D): "Crowded Pub",
-    endian_swap(0xF3FF853B): "Pub",
-    endian_swap(0xB0E7C209): "Old Ballroom",
-    endian_swap(0x6B68CFB4): "Courtyard 1",
-    endian_swap(0x8FE37670): "Double Modern",
-    endian_swap(0x206114E6): "Modern",
-    0x6f81a558: "Veranda",
-    0x9dc5bb5e: "Courtyard",
-    0x168f4f62: "Library",
-    0x1dbd8e41: "Balcony",
-    0x7173b8bf: "Gallery",
-    0x9032ce22: "Terrace",
-    0x2e37f15b: "Moderne",
-    0x79dfa0cf: "Teien",
-    0x98e45d99: "Aquarium",
-    0x35ac5135: "Redwoods",
-    0xf3e61461: "Modern"
-}
-
-MODE_MAP = {
-    0: "k",
-    1: "p",
-    2: "a"
-}
-
-
-HEADER_DATA_MINIMUM_BYTES = 416
-
+from struct import unpack, pack
+from datetime import datetime
+from base64 import urlsafe_b64encode
+from os import walk, path
 
 class ReplayParser:
-    def __init__(self, replay_file_path):
-        self.filepath = replay_file_path
-        with open(replay_file_path, "rb") as replay_file:
-            bytes_read = bytearray(replay_file.read())
+    class __ReplayVersionConstants:
+        def __init__(
+                self, magic_number=0x00,
+                file_version=0x04, protocol_version=0x08, spyparty_version=0x0C,
+                duration=0x14, uuid=0x18, timestamp=0x28, playid=0x2C,
+                players=0x50, len_user_spy=0x2E, len_user_sniper=0x2F,
+                len_disp_spy=None, len_disp_sniper=None, guests=None, clock=None,
+                result=0x30, setup=0x34, venue=0x38, variant=None,
+                missions_s=0x3C, missions_p=0x40, missions_c=0x44
+        ):
+            self.magic_number = magic_number
+            self.file_version = file_version
+            self.protocol_version = protocol_version
+            self.spyparty_version = spyparty_version
+            self.duration = duration
+            self.uuid = uuid
+            self.timestamp = timestamp
+            self.playid = playid
+            self.players = players
+            self.len_user_spy = len_user_spy
+            self.len_user_sniper = len_user_sniper
+            self.len_disp_spy = len_disp_spy
+            self.len_disp_sniper = len_disp_sniper
+            self.guests = guests
+            self.clock = clock
+            self.result = result
+            self.setup = setup
+            self.venue = venue
+            self.variant = variant
+            self.missions_s = missions_s
+            self.missions_p = missions_p
+            self.missions_c = missions_c
 
-        if len(bytes_read) < HEADER_DATA_MINIMUM_BYTES:
-            raise Exception("We require a minimum of %d bytes for replay parsing" % HEADER_DATA_MINIMUM_BYTES)
-        self.bytes_read = bytes_read
+        @staticmethod
+        def __unpack_short(sector, start):
+            return unpack('H', sector(start, 2))[0]
 
-    def _unpack_missions(self, offset):
-        data = self._unpack_int(offset)
-        missions = []
-        if data & (1 << 0):
-            # missions.append("Bug Ambassador")
-            missions.append("Bug")
-        if data & (1 << 1):
-            # missions.append("Contact Double Agent")
-            missions.append("Contact")
-        if data & (1 << 2):
-            # missions.append("Transfer Microfilm")
-            missions.append("Transfer")
-        if data & (1 << 3):
-            # missions.append("Swap Statue")
-            missions.append("Swap")
-        if data & (1 << 4):
-            # missions.append("Inspect Statues")
-            missions.append("Inspect")
-        if data & (1 << 5):
-            # missions.append("Seduce Target")
-            missions.append("Seduce")
-        if data & (1 << 6):
-            # missions.append("Purloin Guest List")
-            missions.append("Purloin")
-        if data & (1 << 7):
-            # missions.append("Fingerprint Ambassador")
-            missions.append("Fingerprint")
+        @staticmethod
+        def __unpack_int(sector, start):
+            return unpack('I', sector(start, 4))[0]
 
-        return missions
+        @staticmethod
+        def __unpack_byte(sector, offset):
+            return unpack('B', sector[offset])[0]
+
+        @staticmethod
+        def __unpack_float(sector, offset):
+            return unpack('f', sector(offset, 4))[0]
+
+        @staticmethod
+        def __read_bytes(sector, start, length):
+            return sector[start:start + length]
+
+        def extract_names(self, sector):
+            spy_user_len = sector[self.len_user_spy]
+            sni_user_len = sector[self.len_user_sniper]
+            total_offset = self.players
+            spy_user = self.__read_bytes(sector, total_offset, spy_user_len).decode()
+            total_offset += spy_user_len
+            sni_user = self.__read_bytes(sector, total_offset, sni_user_len).decode()
+            if self.len_disp_spy and self.len_disp_sniper:
+                total_offset += sni_user_len
+                spy_disp_len = sector[self.len_disp_spy]
+                sni_disp_len = sector[self.len_disp_sniper]
+                spy_disp = self.__read_bytes(sector, total_offset, spy_disp_len).decode()
+                total_offset += spy_disp_len
+                sni_disp = self.__read_bytes(sector, total_offset, sni_disp_len).decode()
+            else:
+                spy_disp, sni_disp = spy_user, sni_user
+            return spy_user, sni_user, spy_disp, sni_disp
 
     @staticmethod
-    def _get_game_type(info):
+    def endian_swap(value):
+        return unpack("<I", pack(">I", value))[0]
+
+    __HEADER_DATA_MINIMUM_BYTES = 416
+    __OFFSETS_DICT = {
+        3: __ReplayVersionConstants(),
+        4: __ReplayVersionConstants(
+            players=0x54,
+            result=0x34,
+            setup=0x38,
+            venue=0x3C,
+            missions_s=0x40,
+            missions_p=0x44,
+            missions_c=0x48
+        ),
+        5: __ReplayVersionConstants(
+            players=0x60,
+            len_user_spy=0x2E,
+            len_user_sniper=0x2F,
+            len_disp_spy=0x30,
+            len_disp_sniper=0x31,
+            guests=0x50,
+            clock=0x54,
+            result=0x38,
+            setup=0x3C,
+            venue=0x40,
+            missions_s=0x44,
+            missions_p=0x48,
+            missions_c=0x4C
+        ),
+        6: __ReplayVersionConstants(
+            players=0x64,
+            len_user_spy=0x2E,
+            len_user_sniper=0x2F,
+            len_disp_spy=0x30,
+            len_disp_sniper=0x31,
+            guests=0x54,
+            clock=0x58,
+            result=0x38,
+            setup=0x3C,
+            venue=0x40,
+            variant=0x44,
+            missions_s=0x48,
+            missions_p=0x4C,
+            missions_c=0x50
+        )
+    }
+    __LEVEL_MAP = {
+        endian_swap(0x26C3303A): "High-rise",  # "BvB High-Rise",
+        endian_swap(0xAAFA9659): "Ballroom",  # "BvB (New Art) Ballroom",
+        endian_swap(0x2519125B): "Ballroom",
+        endian_swap(0xA1C5561A): "High-rise",  # "High-Rise",
+        endian_swap(0x5EAAB328): "Old Gallery",
+        endian_swap(0x750C0A29): "Old Courtyard 2",  # "Courtyard 2",
+        endian_swap(0x83F59536): "Panopticon",
+        endian_swap(0x91A0BEA8): "Old Veranda",
+        endian_swap(0xBC1F89B8): "Old Balcony",
+        endian_swap(0x4073020D): "Pub",  # "Crowded Pub",
+        endian_swap(0xF3FF853B): "Pub",
+        endian_swap(0xB0E7C209): "Old Ballroom",
+        endian_swap(0x6B68CFB4): "Old Courtyard",  # "Courtyard 1",
+        endian_swap(0x8FE37670): "Double Modern",
+        endian_swap(0x206114E6): "Modern",
+        0x6f81a558: "Veranda",
+        0x9dc5bb5e: "Courtyard",
+        0x168f4f62: "Library",
+        0x1dbd8e41: "Balcony",
+        0x7173b8bf: "Gallery",
+        0x9032ce22: "Terrace",
+        0x2e37f15b: "Moderne",
+        0x79dfa0cf: "Teien",
+        0x98e45d99: "Aquarium",
+        0x35ac5135: "Redwoods",
+        0xf3e61461: "Modern"
+    }
+
+    __VARIANT_MAP = {
+        "Teien": [
+            "BooksBooksBooks",
+            "BooksStatuesBooks",
+            "StatuesBooksBooks",
+            "StatuesStatuesBooks",
+            "BooksBooksStatues",
+            "BooksStatuesStatues",
+            "StatuesBooksStatues",
+            "StatuesStatuesStatues"
+        ],
+        "Aquarium": [
+            "Bottom",
+            "Top"
+        ],
+    }
+    __RESULT_MAP = {
+        0: "Missions Win",
+        1: "Time Out",
+        2: "Spy Shot",
+        3: "Civilian Shot",
+        4: "In Progress"
+    }
+    __MODE_MAP = {
+        0: "k",
+        1: "p",
+        2: "a"
+    }
+
+    def _unpack_missions(self, sector, offset):
+        data = self._unpack_int(sector, offset)
+        missions = set()
+        if data & (1 << 0):
+            # missions.append("Bug Ambassador")
+            missions.add("Bug")
+        if data & (1 << 1):
+            # missions.append("Contact Double Agent")
+            missions.add("Contact")
+        if data & (1 << 2):
+            # missions.append("Transfer Microfilm")
+            missions.add("Transfer")
+        if data & (1 << 3):
+            # missions.append("Swap Statue")
+            missions.add("Swap")
+        if data & (1 << 4):
+            # missions.append("Inspect Statues")
+            missions.add("Inspect")
+        if data & (1 << 5):
+            # missions.append("Seduce Target")
+            missions.add("Seduce")
+        if data & (1 << 6):
+            # missions.append("Purloin Guest List")
+            missions.add("Purloin")
+        if data & (1 << 7):
+            # missions.append("Fingerprint Ambassador")
+            missions.add("Fingerprint")
+        return missions
+
+    def _get_game_type(self, info):
         mode = info >> 28
         available = (info & 0x0FFFC000) >> 14
         required = info & 0x00003FFF
 
-        real_mode = MODE_MAP[mode]
-        if real_mode == "k":
-            return "k" + str(required)
-
+        real_mode = self.__MODE_MAP[mode]
+        # if real_mode == "k":
+        #     return "k" + str(required)
+        # known becomes k8/8
         return "%s%d/%d" % (real_mode, required, available)
 
-    def _check_magic_number(self):
-        return self.bytes_read[:4] == b"RPLY"
+    @staticmethod
+    def _check_magic_number(sector):
+        return sector[:4] == b"RPLY"
 
-    def _check_file_version(self):
-        read_file_version = self._unpack_int(0x04)
-
-        if read_file_version == 3:
-            return ReplayVersion3Offsets()
-        elif read_file_version == 4:
-            return ReplayVersion4Offsets()
-        elif read_file_version == 5:
-            return ReplayVersion5Offsets()
-        elif read_file_version == 6:
-            return ReplayVersion6Offsets()
-        else:
+    def _check_file_version(self, sector):
+        read_file_version = self._unpack_int(sector, 0x04)
+        try:
+            return self.__OFFSETS_DICT[read_file_version]
+        except KeyError:
             raise Exception("Unknown file version %d" % read_file_version)
 
-    def _read_bytes(self, start, length):
-        return self.bytes_read[start:(start + length)]
+    @staticmethod
+    def _read_bytes(sector, start, length):
+        return sector[start:(start + length)]
 
-    def _unpack_short(self, start):
-        return struct.unpack('H', self._read_bytes(start, 2))[0]
+    def _unpack_short(self, sector, start):
+        return unpack('H', self._read_bytes(sector, start, 2))[0]
 
-    def _unpack_int(self, start):
-        return struct.unpack('I', self._read_bytes(start, 4))[0]
+    def _unpack_int(self, sector, start):
+        return unpack('I', self._read_bytes(sector, start, 4))[0]
 
-    def _unpack_byte(self, offset):
-        return struct.unpack('B', self.bytes_read[offset])[0]
+    @staticmethod
+    def _unpack_byte(sector, offset):
+        return unpack('B', sector[offset])[0]
 
-    def _unpack_float(self, offset):
-        return struct.unpack('f', self._read_bytes(offset, 4))[0]
+    def _unpack_float(self, sector, offset):
+        return unpack('f', self._read_bytes(sector, offset, 4))[0]
 
-    def parse(self):
-        if not self._check_magic_number():
+    def parse(self, replay_file_path):
+        with open(replay_file_path, "rb") as replay_file:
+            bytes_read = bytearray(replay_file.read())
+
+        if len(bytes_read) < self.__HEADER_DATA_MINIMUM_BYTES:
+            raise Exception("We require a minimum of %d bytes for replay parsing" % self.__HEADER_DATA_MINIMUM_BYTES)
+
+        if not self._check_magic_number(bytes_read):
             raise Exception("Unknown File")
 
-        ret = {}
+        offsets = self._check_file_version(bytes_read)
 
-        offsets = self._check_file_version()
+        name_extracts = offsets.extract_names(bytes_read)
+        uuid_offset = offsets.uuid
+        ret = {
+            'spy_username': name_extracts[0], 'sniper_username': name_extracts[1],
+            'spy_displayname': name_extracts[2], 'sniper_displayname': name_extracts[3],
+            'result': self.__RESULT_MAP[self._unpack_int(bytes_read, offsets.result)],
+            'venue': self.__LEVEL_MAP[self._unpack_int(bytes_read, offsets.venue)],
+            'selected_missions': self._unpack_missions(bytes_read, offsets.missions_s),
+            'picked_missions': self._unpack_missions(bytes_read, offsets.missions_p),
+            'completed_missions': self._unpack_missions(bytes_read, offsets.missions_c),
+            'playid': self._unpack_short(bytes_read, offsets.playid),
+            'start_time': datetime.fromtimestamp(self._unpack_int(bytes_read, offsets.timestamp)),
+            'duration': int(self._unpack_float(bytes_read, offsets.duration)),
+            'game_type': self._get_game_type(self._unpack_int(bytes_read, offsets.setup)),
+            'uuid': urlsafe_b64encode(bytes_read[uuid_offset:uuid_offset + 16]).decode(),
+            'guests': self._unpack_int(bytes_read, offsets.guests) if offsets.guests else None,
+            'clock': self._unpack_int(bytes_read, offsets.clock) if offsets.clock else None,
+            'variant': None,
+            'path': replay_file_path
+        }
 
-        ret['spy_username'] = offsets.extract_spy_username(self.bytes_read)
-        ret['sniper_username'] = offsets.extract_sniper_username(self.bytes_read)
-
-        ret['result'] = RESULT_MAP[self._unpack_int(offsets.get_game_result_offset())]
-
-        try:
-            ret['level'] = LEVEL_MAP[self._unpack_int(offsets.get_level_offset())]
-        except KeyError:
-            read_hash = self._unpack_int(offsets.get_level_offset())
-            print(self.filepath)
-            raise Exception("Unknown map hash %x" % read_hash)
-
-        ret['selected_missions'] = self._unpack_missions(offsets.get_selected_missions_offset())
-        ret['picked_missions'] = self._unpack_missions(offsets.get_picked_missions_offset())
-        ret['completed_missions'] = self._unpack_missions(offsets.get_completed_missions_offset())
-
-        ret['sequence_number'] = self._unpack_short(offsets.get_sequence_number_offset())
-
-        ret['start_time'] = datetime.datetime.fromtimestamp(self._unpack_int(offsets.get_timestamp_offset()))
-
-        ret['duration'] = int(self._unpack_float(offsets.get_duration_offset()))
-        ret['game_type'] = self._get_game_type(self._unpack_int(offsets.get_game_type_offset()))
-
-        uuid_offset = offsets.get_uuid_offset()
-        ret['uuid'] = base64.urlsafe_b64encode(self.bytes_read[uuid_offset:uuid_offset+16]).decode()
-
-        if offsets.contains_map_variant():
+        if offsets.variant:
             try:
-                ret['map_variant'] = VARIANT_MAP[ret['level']][self._unpack_int(offsets.get_map_variant_offset())]
+                ret['variant'] = self.__VARIANT_MAP[ret['level']][self._unpack_int(bytes_read, offsets.variant)]
             except KeyError:
                 pass
 
         if ret['uuid'].find('=') > 0:
             ret['uuid'] = ret['uuid'][:ret['uuid'].find('=')]
 
-        if offsets.contains_display_names():
-            ret['spy_displayname'] = offsets.extract_spy_display_name(self.bytes_read)
-            ret['sniper_displayname'] = offsets.extract_sniper_display_name(self.bytes_read)
-        else:
-            ret['spy_displayname'] = ret['spy_username']
-            ret['sniper_displayname'] = ret['sniper_username']
-
-        if offsets.contains_guest_count():
-            ret['guest_count'] = self._unpack_int(offsets.get_guest_count_offset())
-
-        if offsets.contains_start_clock():
-            ret['start_clock_seconds'] = self._unpack_int(offsets.get_start_duration_offset())
-
-        ret['file_path'] = self.filepath
-
         return ret
+
+    @staticmethod
+    def find_replays(from_directory):
+        replays = []
+        for root, _, files in walk(from_directory):
+            if "__" in root:
+                continue
+            for file in files:
+                if file.endswith(".replay"):
+                    file_path = path.join(root, file)
+                    if len(file_path) > 255:
+                        # deal with excessively long paths later
+                        continue
+                    replays.append(file_path)
+        return replays
+
+    def filter_replays(self, replays, criteria):
+        return list(filter(lambda replay: all(crit(replay) for crit in criteria),
+                           map(self.parse, replays)))
+
+    def find_and_filter_replays(self, replays_directory, criteria):
+        return self.filter_replays(self.find_replays(replays_directory), criteria)

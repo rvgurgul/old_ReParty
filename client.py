@@ -126,28 +126,28 @@ def game_search_window(cfg):
                               key='venue_setup_of')
                 ],
                 [sgui.Listbox(values=venue_list, size=(20, 8), select_mode='multiple', key='venues_wanted')],
-                [
-                    sgui.Text("Clock: [", pad=(0, 4)),
-                    sgui.Combo(list(start_clock_times), pad=(0, 4),
-                               default_value='0:00'),
-                    sgui.Text(", ", pad=(0, 4)),
-                    sgui.Combo(list(start_clock_times)[::-1], pad=(0, 4),
-                               default_value='6:30'),
-                    sgui.Text("]", pad=(0, 4))
-                ],
-                [
-                    sgui.Text("Guests:   [", pad=(0, 4)),
-                    sgui.Spin([f"0{x}" if x < 10 else str(x) for x in range(3, 22)], pad=(0, 4),
-                              initial_value='03',
-                              enable_events=True,
-                              key='guests_at_least'),
-                    sgui.Text(", ", pad=(0, 4)),
-                    sgui.Spin([f"0{x}" if x < 10 else str(x) for x in range(3, 22)], pad=(0, 4),
-                              initial_value='21',
-                              enable_events=True,
-                              key='guests_at_most'),
-                    sgui.Text("]", pad=(0, 4))
-                ]
+                # [
+                #     sgui.Text("Clock: [", pad=(0, 4)),
+                #     sgui.Combo(list(start_clock_times), pad=(0, 4),
+                #                default_value='0:00'),
+                #     sgui.Text(", ", pad=(0, 4)),
+                #     sgui.Combo(list(start_clock_times)[::-1], pad=(0, 4),
+                #                default_value='6:30'),
+                #     sgui.Text("]", pad=(0, 4))
+                # ],
+                # [
+                #     sgui.Text("Guests:   [", pad=(0, 4)),
+                #     sgui.Spin([f"0{x}" if x < 10 else str(x) for x in range(3, 22)], pad=(0, 4),
+                #               initial_value='03',
+                #               enable_events=True,
+                #               key='guests_at_least'),
+                #     sgui.Text(", ", pad=(0, 4)),
+                #     sgui.Spin([f"0{x}" if x < 10 else str(x) for x in range(3, 22)], pad=(0, 4),
+                #               initial_value='21',
+                #               enable_events=True,
+                #               key='guests_at_most'),
+                #     sgui.Text("]", pad=(0, 4))
+                # ]
             ]),
             sgui.VerticalSeparator(),
             sgui.Column([
@@ -159,20 +159,20 @@ def game_search_window(cfg):
                                  enable_events=True,
                                  key='missions_wanted')
                 ],
-                [
-                    sgui.Text("at least"),
-                    sgui.Spin(tuple(range(0, 9)),
-                              initial_value=0,
-                              enable_events=True,
-                              key='missions_at_least'),
-                ],
-                [
-                    sgui.Text("at most"),
-                    sgui.Spin(tuple(range(0, 9)),
-                              initial_value=8,
-                              enable_events=True,
-                              key='missions_at_most')
-                ]
+                # [
+                #     sgui.Text("at least"),
+                #     sgui.Spin(tuple(range(0, 9)),
+                #               initial_value=0,
+                #               enable_events=True,
+                #               key='missions_at_least'),
+                # ],
+                # [
+                #     sgui.Text("at most"),
+                #     sgui.Spin(tuple(range(0, 9)),
+                #               initial_value=8,
+                #               enable_events=True,
+                #               key='missions_at_most')
+                # ]
             ]),
             sgui.VerticalSeparator(),
             sgui.Column([
@@ -248,24 +248,24 @@ def game_search_window(cfg):
         #     if am < al:
         #         window['guests_at_least'](am)
 
-        elif event == 'missions_at_least':
-            al = values['missions_at_least']
-            ms = len(values['missions_wanted'])
-            if al > ms:
-                window['missions_at_least'](ms)
-            else:
-                am = values['missions_at_most']
-                if al >= am:
-                    window['missions_at_most'](al)
-        elif event == 'missions_at_most':
-            am = values['missions_at_most']
-            ms = len(values['missions_wanted'])
-            if am >= ms:
-                window['missions_at_most'](ms)
-            else:
-                al = values['missions_at_least']
-                if al >= am:
-                    window['missions_at_least'](am)
+        # elif event == 'missions_at_least':
+        #     al = values['missions_at_least']
+        #     ms = len(values['missions_wanted'])
+        #     if al > ms:
+        #         window['missions_at_least'](ms)
+        #     else:
+        #         am = values['missions_at_most']
+        #         if al >= am:
+        #             window['missions_at_most'](al)
+        # elif event == 'missions_at_most':
+        #     am = values['missions_at_most']
+        #     ms = len(values['missions_wanted'])
+        #     if am >= ms:
+        #         window['missions_at_most'](ms)
+        #     else:
+        #         al = values['missions_at_least']
+        #         if al >= am:
+        #             window['missions_at_least'](am)
 
         # elif event == 'missions_wanted':
         #     ms = len(values['missions_wanted'])
@@ -301,36 +301,36 @@ def game_search_window(cfg):
             window['venue_setup_any']('X')
             window['venue_setup_of']('X')
             window['venues_wanted'](venue_list)
-            window['guests_at_least'](0)
-            window['guests_at_most'](0)
+            # window['guests_at_least'](0)
+            # window['guests_at_most'](0)
             window['missions_wanted'](mission_list)
-            window['missions_at_least'](0)
-            window['missions_at_most'](0)
+            # window['missions_at_least'](0)
+            # window['missions_at_most'](0)
             window['results_wanted'](game_result_list)
         elif event == 'button_search':
             criteria = []
-            # print(values)
-
-            alias_left = clean_displayname(values['alias_left'])
-            alias_right = clean_displayname(values['alias_right'])
+            alias_left = [clean_displayname(name.strip()) for name in values['alias_left'].split(",") if name]
+            alias_right = [clean_displayname(name.strip()) for name in values['alias_right'].split(",") if name]
             role_match = values['role_matching']
             if role_match == 'Spy':
                 if alias_left:
-                    criteria.append(lambda rep: clean_displayname(rep["sniper_displayname"]) == alias_left)
+                    criteria.append(lambda rep: clean_displayname(rep["sniper_displayname"]) in alias_left)
                 if alias_right:
-                    criteria.append(lambda rep: clean_displayname(rep["spy_displayname"]) == alias_right)
+                    criteria.append(lambda rep: clean_displayname(rep["spy_displayname"]) in alias_right)
             elif role_match == 'Sniper':
                 if alias_left:
-                    criteria.append(lambda rep: clean_displayname(rep["spy_displayname"]) == alias_left)
+                    criteria.append(lambda rep: clean_displayname(rep["spy_displayname"]) in alias_left)
                 if alias_right:
-                    criteria.append(lambda rep: clean_displayname(rep["sniper_displayname"]) == alias_right)
+                    criteria.append(lambda rep: clean_displayname(rep["sniper_displayname"]) in alias_right)
             elif role_match == 'Either':
                 if alias_left:
-                    criteria.append(lambda rep: alias_left in {clean_displayname(rep["spy_displayname"]),
-                                                               clean_displayname(rep["sniper_displayname"])})
+                    criteria.append(lambda rep:
+                                    clean_displayname(rep["spy_displayname"]) in alias_left or
+                                    clean_displayname(rep["sniper_displayname"]) in alias_left)
                 if alias_right:
-                    criteria.append(lambda rep: alias_right in {clean_displayname(rep["spy_displayname"]),
-                                                                clean_displayname(rep["sniper_displayname"])})
+                    criteria.append(lambda rep:
+                                    clean_displayname(rep["spy_displayname"]) in alias_right or
+                                    clean_displayname(rep["sniper_displayname"]) in alias_right)
             # description = (
             #     f"{alias_left if alias_left else 'Any player'} vs {alias_right if alias_right else 'Any player'}"
             #     f"{f' as {role_match}' if role_match != 'Either' else ''}"
@@ -367,13 +367,15 @@ def game_search_window(cfg):
             # criteria.append(lambda rep: guests_atl <= rep["guest_count"] <= guests_atm)
 
             missions_wanted = set(values['missions_wanted'])
-            miss_atl, miss_atm = values['missions_at_least'], values['missions_at_most']
             if missions_wanted:
-                criteria.append(lambda rep:
-                                miss_atl <= len(set(rep["completed_missions"]) & missions_wanted) <= miss_atm)
-            elif values['missions_at_most']:
-                criteria.append(lambda rep: len(rep["completed_missions"]) in
-                                range(miss_atl, miss_atm + 1))
+                criteria.append(lambda rep: len(missions_wanted - set(rep["completed_missions"])) == 0)
+            # miss_atl, miss_atm = values['missions_at_least'], values['missions_at_most']
+            # if missions_wanted:
+            #     criteria.append(lambda rep:
+            #                     miss_atl <= len(set(rep["completed_missions"]) & missions_wanted) <= miss_atm)
+            # elif values['missions_at_most']:
+            #     criteria.append(lambda rep: len(rep["completed_missions"]) in
+            #                     range(miss_atl, miss_atm + 1))
             # if values['missions_at_least']:
             #     description += f" with at least {values['missions_at_least']}"
             #     if values['missions_at_most']:
@@ -387,14 +389,16 @@ def game_search_window(cfg):
             if values["option_countdown"]:
                 criteria.append(lambda rep: len(rep["completed_missions"]) >= int(rep["game_type"][1]))
 
+            window['search_progress']("Scanning replays...please wait")
             replay_batch = scan_and_filter_replays(
                 replays_directory=cfg["replays_directory"],
                 criteria=criteria
             )
             count = len(replay_batch)
-            window['search_progress'].update(f"{count} result{'s' if count == 1 else ''} found")
+            window['search_progress'].update(f"{count} result{'' if count == 1 else 's'} found")
 
-            replay_analysis_window(replay_batch, primary_role=role_match)
+            if count:
+                replay_analysis_window(replay_batch, primary_role=role_match)
 
     window.close()
 def venue_select_window(cfg):
@@ -568,6 +572,12 @@ def replay_analysis_window(replays, **params):
         data_list.sort(key=lambda pr: (pr.sn_w, pr.sn_g) if pr.sn_g else (0, 0), reverse=True)
 
     layout = [
+        sgui.Menu([
+            ['File', ['Cancel', 'Reset', '---', 'Exit', ]],
+            ['Edit', ['Clear Entries', 'Paste', ['Special', 'Normal', ]]],
+            ['Configure', ['Replays Directory', 'Choose Style', good_styles]],
+            ['Help', 'About...'],
+        ]),
         sgui.Column([
             [sgui.Button("Players", size=(20, 1), key='sort_alpha')],
             [sgui.Column([[sgui.Text(pr.name, size=(19, 1), justification='right')] for pr in data_list])]
@@ -691,3 +701,10 @@ if __name__ == '__main__':
 
     game_search_window(cfg=config)
     config.save()
+
+#
+storage_format = {
+    "uuid": {
+        ""
+    }
+}
