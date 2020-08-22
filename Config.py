@@ -50,6 +50,9 @@ class Config:
             except:
                 print("ERROR WHILE WRITING CONFIG???")
 
+    def is_saved(self):
+        return self.__saved[self.path]
+
     def __getitem__(self, item):
         return self.__configs[self.path][item]
 

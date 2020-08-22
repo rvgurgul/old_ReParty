@@ -43,19 +43,25 @@ class ReplayParser:
             spy_user_len = sector[self.len_user_spy]
             sni_user_len = sector[self.len_user_sniper]
             total_offset = self.players
-            spy_user = self.read_bytes(sector, total_offset, spy_user_len).decode()
+
+            spy_name = self.read_bytes(sector, total_offset, spy_user_len).decode()
             total_offset += spy_user_len
-            sni_user = self.read_bytes(sector, total_offset, sni_user_len).decode()
-            if self.len_disp_spy and self.len_disp_sniper:
+            sni_name = self.read_bytes(sector, total_offset, sni_user_len).decode()
+
+            if self.len_disp_spy or self.len_disp_sniper:
                 total_offset += sni_user_len
                 spy_disp_len = sector[self.len_disp_spy]
-                sni_disp_len = sector[self.len_disp_sniper]
-                spy_disp = self.read_bytes(sector, total_offset, spy_disp_len).decode()
+                temp = self.read_bytes(sector, total_offset, spy_disp_len).decode()
+                if temp:
+                    spy_name = temp
+
                 total_offset += spy_disp_len
-                sni_disp = self.read_bytes(sector, total_offset, sni_disp_len).decode()
-            else:
-                spy_disp, sni_disp = spy_user, sni_user
-            return spy_user, sni_user, spy_disp, sni_disp
+                sni_disp_len = sector[self.len_disp_sniper]
+                temp = self.read_bytes(sector, total_offset, sni_disp_len).decode()
+                if temp:
+                    sni_name = temp
+
+            return spy_name, sni_name
 
     @staticmethod
     def endian_swap(value):
@@ -194,17 +200,6 @@ class ReplayParser:
         return "%s%d/%d" % (real_mode, required, available)
 
     @staticmethod
-    def __check_magic_number(sector):
-        return sector[:4] == b"RPLY"
-
-    def __check_file_version(self, sector):
-        read_file_version = self.__unpack_int(sector, 0x04)
-        try:
-            return self.__OFFSETS_DICT[read_file_version]
-        except KeyError:
-            raise Exception("Unknown file version %d" % read_file_version)
-
-    @staticmethod
     def __read_bytes(sector, start, length):
         return sector[start:(start + length)]
 
@@ -226,18 +221,25 @@ class ReplayParser:
             bytes_read = bytearray(replay_file.read())
 
         if len(bytes_read) < self.__HEADER_DATA_MINIMUM_BYTES:
-            raise Exception("We require a minimum of %d bytes for replay parsing" % self.__HEADER_DATA_MINIMUM_BYTES)
+            # raise Exception(f"A minimum of {self.__HEADER_DATA_MINIMUM_BYTES} bytes are required for replay parsing"
+            #                 f" ({replay_file_path})")
+            return
 
-        if not self.__check_magic_number(bytes_read):
-            raise Exception("Unknown File")
+        if bytes_read[:4] != b"RPLY":
+            # raise Exception("Unknown File")
+            return
 
-        offsets = self.__check_file_version(bytes_read)
+        read_file_version = self.__unpack_int(bytes_read, 0x04)
+        try:
+            offsets = self.__OFFSETS_DICT[read_file_version]
+        except KeyError:
+            # raise Exception("Unknown file version %d" % read_file_version)
+            return
 
         name_extracts = offsets.extract_names(bytes_read)
         uuid_offset = offsets.uuid
         ret = {
-            'spy_username': name_extracts[0], 'sniper_username': name_extracts[1],
-            'spy_displayname': name_extracts[2], 'sniper_displayname': name_extracts[3],
+            'spy': name_extracts[0], 'sniper': name_extracts[1],
             'result': self.__RESULT_MAP[self.__unpack_int(bytes_read, offsets.result)],
             'venue': self.__VENUE_MAP[self.__unpack_int(bytes_read, offsets.venue)],
             'selected_missions': self.__unpack_missions(bytes_read, offsets.missions_s),
@@ -280,9 +282,18 @@ class ReplayParser:
                     replays.append(file_path)
         return replays
 
-    def filter_replays(self, replays, criteria):
-        return list(filter(lambda replay: all(crit(replay) for crit in criteria),
-                           map(self.parse, replays)))
+    def parse_replays(self, replays):
+        return map(self.parse, replays)
+
+    @staticmethod
+    def filter_replays(replays, criteria):
+        # not any(not crit(...
+        # filter games where any of the criteria are False
+        return list(filter(lambda replay: not any(not crit(replay) for crit in criteria), replays))
 
     def find_and_filter_replays(self, replays_directory, criteria):
-        return self.filter_replays(self.find_replays(replays_directory), criteria)
+        # reps = self.find_replays(replays_directory)
+        # parsed = self.parse_replays(reps)
+        # filtered = self.filter_replays(parsed, criteria)
+        # return filtered
+        return self.filter_replays(self.parse_replays(self.find_replays(replays_directory)), criteria)
