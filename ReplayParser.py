@@ -4,6 +4,37 @@ from base64 import urlsafe_b64encode
 from os import walk, path
 
 class ReplayParser:
+    class Replay:
+        def __init__(
+                self, uuid, playid, date, spy, sniper, result, venue, variant, game_type, guests, clock, duration,
+                selected_missions, picked_missions, completed_missions
+        ):
+            x = uuid.find('=')
+            if x:
+                uuid = uuid[:x]
+            self.uuid = uuid
+            self.playid = playid
+            self.date = date
+            self.spy = spy
+            self.sniper = sniper
+            self.result = result
+            self.setup = game_type
+            self.venue = venue
+            self.variant = variant
+            self.guests = guests
+            self.clock = clock
+            self.duration = duration
+            self.selected_missions = selected_missions
+            self.completed_missions = completed_missions
+            self.picked_missions = picked_missions if game_type[0] == 'p' else None
+
+    # TODO
+    # def incomplete_missions(self):
+    # def unpicked_missions(self):
+    # def unselected_missions(self):
+
+
+
     class __ReplayVersionConstants:
         def __init__(
                 self, magic_number=0x00, file_version=0x04, protocol_version=0x08, spyparty_version=0x0C,
@@ -60,12 +91,7 @@ class ReplayParser:
                 temp = self.read_bytes(sector, total_offset, sni_disp_len).decode()
                 if temp:
                     sni_name = temp
-
             return spy_name, sni_name
-
-    @staticmethod
-    def endian_swap(value):
-        return unpack("<I", pack(">I", value))[0]
 
     __HEADER_DATA_MINIMUM_BYTES = 416
     __OFFSETS_DICT = {
@@ -140,56 +166,57 @@ class ReplayParser:
         1: "p",
         2: "a"
     }
+    __MISSION_OFFSETS = {
+        "Bug": 0,
+        "Contact": 1,
+        "Transfer": 2,
+        "Swap": 3,
+        "Inspect": 4,
+        "Seduce": 5,
+        "Purloin": 6,
+        "Fingerprint": 7,
+    }
 
     def __init__(self):
-        self.__VENUE_MAP = {
-            self.endian_swap(0x26C3303A): "High-rise",
-            self.endian_swap(0xAAFA9659): "Ballroom",
-            self.endian_swap(0x2519125B): "Ballroom",
-            self.endian_swap(0xA1C5561A): "High-rise",
-            self.endian_swap(0x5EAAB328): "Old Gallery",
-            self.endian_swap(0x750C0A29): "Old Courtyard 2",
-            self.endian_swap(0x83F59536): "Panopticon",
-            self.endian_swap(0x91A0BEA8): "Old Veranda",
-            self.endian_swap(0xBC1F89B8): "Old Balcony",
-            self.endian_swap(0x4073020D): "Pub",
-            self.endian_swap(0xF3FF853B): "Pub",
-            self.endian_swap(0xB0E7C209): "Old Ballroom",
-            self.endian_swap(0x6B68CFB4): "Old Courtyard",
-            self.endian_swap(0x8FE37670): "Double Modern",
-            self.endian_swap(0x206114E6): "Modern",
-            0x6f81a558: "Veranda",
-            0x9dc5bb5e: "Courtyard",
-            0x168f4f62: "Library",
-            0x1dbd8e41: "Balcony",
-            0x7173b8bf: "Gallery",
-            0x9032ce22: "Terrace",
-            0x2e37f15b: "Moderne",
-            0x79dfa0cf: "Teien",
-            0x98e45d99: "Aquarium",
-            0x35ac5135: "Redwoods",
-            0xf3e61461: "Modern"
-        }
+        if self.__VENUE_MAP is None:
+            def endian_swap(value):
+                return unpack("<I", pack(">I", value))[0]
+
+            self.__VENUE_MAP = {
+                endian_swap(0x26C3303A): "High-rise",
+                endian_swap(0xAAFA9659): "Ballroom",
+                endian_swap(0x2519125B): "Ballroom",
+                endian_swap(0xA1C5561A): "High-rise",
+                endian_swap(0x5EAAB328): "Old Gallery",
+                endian_swap(0x750C0A29): "Old Courtyard 2",
+                endian_swap(0x83F59536): "Panopticon",
+                endian_swap(0x91A0BEA8): "Old Veranda",
+                endian_swap(0xBC1F89B8): "Old Balcony",
+                endian_swap(0x4073020D): "Pub",
+                endian_swap(0xF3FF853B): "Pub",
+                endian_swap(0xB0E7C209): "Old Ballroom",
+                endian_swap(0x6B68CFB4): "Old Courtyard",
+                endian_swap(0x8FE37670): "Double Modern",
+                endian_swap(0x206114E6): "Modern",
+                0x6f81a558: "Veranda",
+                0x9dc5bb5e: "Courtyard",
+                0x168f4f62: "Library",
+                0x1dbd8e41: "Balcony",
+                0x7173b8bf: "Gallery",
+                0x9032ce22: "Terrace",
+                0x2e37f15b: "Moderne",
+                0x79dfa0cf: "Teien",
+                0x98e45d99: "Aquarium",
+                0x35ac5135: "Redwoods",
+                0xf3e61461: "Modern"
+            }
 
     def __unpack_missions(self, sector, offset):
         data = self.__unpack_int(sector, offset)
         missions = set()
-        if data & (1 << 0):
-            missions.add("Bug")
-        if data & (1 << 1):
-            missions.add("Contact")
-        if data & (1 << 2):
-            missions.add("Transfer")
-        if data & (1 << 3):
-            missions.add("Swap")
-        if data & (1 << 4):
-            missions.add("Inspect")
-        if data & (1 << 5):
-            missions.add("Seduce")
-        if data & (1 << 6):
-            missions.add("Purloin")
-        if data & (1 << 7):
-            missions.add("Fingerprint")
+        for mission in self.__MISSION_OFFSETS:
+            if data & (1 << self.__MISSION_OFFSETS[mission]):
+                missions.add(mission)
         return missions
 
     def __get_game_type(self, info):
@@ -197,6 +224,8 @@ class ReplayParser:
         available = (info & 0x0FFFC000) >> 14
         required = info & 0x00003FFF
         real_mode = self.__MODE_MAP[mode]
+        if real_mode == 'k':
+            available = required
         return "%s%d/%d" % (real_mode, required, available)
 
     @staticmethod
@@ -238,34 +267,35 @@ class ReplayParser:
 
         name_extracts = offsets.extract_names(bytes_read)
         uuid_offset = offsets.uuid
-        ret = {
-            'spy': name_extracts[0], 'sniper': name_extracts[1],
-            'result': self.__RESULT_MAP[self.__unpack_int(bytes_read, offsets.result)],
-            'venue': self.__VENUE_MAP[self.__unpack_int(bytes_read, offsets.venue)],
-            'selected_missions': self.__unpack_missions(bytes_read, offsets.missions_s),
-            'picked_missions': self.__unpack_missions(bytes_read, offsets.missions_p),
-            'completed_missions': self.__unpack_missions(bytes_read, offsets.missions_c),
-            'playid': self.__unpack_short(bytes_read, offsets.playid),
-            'start_time': datetime.fromtimestamp(self.__unpack_int(bytes_read, offsets.timestamp)),
-            'duration': int(self.__unpack_float(bytes_read, offsets.duration)),
-            'game_type': self.__get_game_type(self.__unpack_int(bytes_read, offsets.setup)),
-            'uuid': urlsafe_b64encode(bytes_read[uuid_offset:uuid_offset + 16]).decode(),
-            'guests': self.__unpack_int(bytes_read, offsets.guests) if offsets.guests else None,
-            'clock': self.__unpack_int(bytes_read, offsets.clock) if offsets.clock else None,
-            'variant': None,
-            'path': replay_file_path
-        }
 
+        date = datetime.fromtimestamp(self.__unpack_int(bytes_read, offsets.timestamp))
+        venue = self.__VENUE_MAP[self.__unpack_int(bytes_read, offsets.venue)]
+        if venue == 'Terrace' and date < datetime(year=2018, month=6, day=3):
+            # Differentiate old from new Terrace by game date
+            venue = 'Old Terrace'
+
+        variant = None
         if offsets.variant:
             try:
-                ret['variant'] = self.__VARIANT_MAP[ret['level']][self.__unpack_int(bytes_read, offsets.variant)]
+                variant = self.__VARIANT_MAP[venue][self.__unpack_int(bytes_read, offsets.variant)]
             except KeyError:
                 pass
 
-        if ret['uuid'].find('=') > 0:
-            ret['uuid'] = ret['uuid'][:ret['uuid'].find('=')]
-
-        return ret
+        return ReplayParser.Replay(
+            uuid=urlsafe_b64encode(bytes_read[uuid_offset:uuid_offset + 16]).decode(),
+            playid=self.__unpack_short(bytes_read, offsets.playid), date=date,
+            # TODO re-add spy/sniper_username because that can be useful for general purpose applications
+            spy=name_extracts[0], sniper=name_extracts[1],
+            result=self.__RESULT_MAP[self.__unpack_int(bytes_read, offsets.result)],
+            venue=venue, variant=variant,
+            game_type=self.__get_game_type(self.__unpack_int(bytes_read, offsets.setup)),
+            guests=self.__unpack_int(bytes_read, offsets.guests) if offsets.guests else None,
+            clock=self.__unpack_int(bytes_read, offsets.clock) if offsets.clock else None,
+            duration=int(self.__unpack_float(bytes_read, offsets.duration)),
+            selected_missions=self.__unpack_missions(bytes_read, offsets.missions_s),
+            picked_missions=self.__unpack_missions(bytes_read, offsets.missions_p),
+            completed_missions=self.__unpack_missions(bytes_read, offsets.missions_c)
+        )
 
     @staticmethod
     def find_replays(from_directory):
@@ -287,13 +317,7 @@ class ReplayParser:
 
     @staticmethod
     def filter_replays(replays, criteria):
-        # not any(not crit(...
-        # filter games where any of the criteria are False
         return list(filter(lambda replay: not any(not crit(replay) for crit in criteria), replays))
 
     def find_and_filter_replays(self, replays_directory, criteria):
-        # reps = self.find_replays(replays_directory)
-        # parsed = self.parse_replays(reps)
-        # filtered = self.filter_replays(parsed, criteria)
-        # return filtered
         return self.filter_replays(self.parse_replays(self.find_replays(replays_directory)), criteria)
