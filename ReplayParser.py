@@ -6,7 +6,8 @@ from os import walk, path
 class ReplayParser:
     class Replay:
         def __init__(
-                self, uuid, playid, date, spy, sniper, result, venue, variant, game_type, guests, clock, duration,
+                self, uuid, playid, date, spy_displayname, sniper_displayname, spy_username, sniper_username, result,
+                venue, variant, game_type, guests, clock, duration,
                 selected_missions, picked_missions, completed_missions
         ):
             x = uuid.find('=')
@@ -15,8 +16,10 @@ class ReplayParser:
             self.uuid = uuid
             self.playid = playid
             self.date = date
-            self.spy = spy
-            self.sniper = sniper
+            self.spy = spy_displayname
+            self.spy_username = spy_username
+            self.sniper = sniper_displayname
+            self.sniper_username = sniper_username
             self.result = result
             self.setup = game_type
             self.venue = venue
@@ -27,13 +30,6 @@ class ReplayParser:
             self.selected_missions = selected_missions
             self.completed_missions = completed_missions
             self.picked_missions = picked_missions if game_type[0] == 'p' else None
-
-    # TODO
-    # def incomplete_missions(self):
-    # def unpicked_missions(self):
-    # def unselected_missions(self):
-
-
 
     class __ReplayVersionConstants:
         def __init__(
@@ -71,27 +67,30 @@ class ReplayParser:
             return sector[start:(start + length)]
 
         def extract_names(self, sector):
-            spy_user_len = sector[self.len_user_spy]
-            sni_user_len = sector[self.len_user_sniper]
             total_offset = self.players
 
-            spy_name = self.read_bytes(sector, total_offset, spy_user_len).decode()
+            spy_user_len = sector[self.len_user_spy]
+            spy_username = self.read_bytes(sector, total_offset, spy_user_len).decode()
             total_offset += spy_user_len
-            sni_name = self.read_bytes(sector, total_offset, sni_user_len).decode()
 
+            sni_user_len = sector[self.len_user_sniper]
+            sniper_username = self.read_bytes(sector, total_offset, sni_user_len).decode()
+
+            spy_display_name, sniper_display_name = spy_username, sniper_username
             if self.len_disp_spy or self.len_disp_sniper:
                 total_offset += sni_user_len
                 spy_disp_len = sector[self.len_disp_spy]
-                temp = self.read_bytes(sector, total_offset, spy_disp_len).decode()
-                if temp:
-                    spy_name = temp
+                spy_display_name = self.read_bytes(sector, total_offset, spy_disp_len).decode()
 
                 total_offset += spy_disp_len
                 sni_disp_len = sector[self.len_disp_sniper]
-                temp = self.read_bytes(sector, total_offset, sni_disp_len).decode()
-                if temp:
-                    sni_name = temp
-            return spy_name, sni_name
+                sniper_display_name = self.read_bytes(sector, total_offset, sni_disp_len).decode()
+
+                if not spy_display_name:
+                    spy_display_name = spy_username
+                if not sniper_display_name:
+                    sniper_display_name = sniper_username
+            return spy_display_name, sniper_display_name, spy_username, sniper_username
 
     __HEADER_DATA_MINIMUM_BYTES = 416
     __OFFSETS_DICT = {
@@ -284,8 +283,8 @@ class ReplayParser:
         return ReplayParser.Replay(
             uuid=urlsafe_b64encode(bytes_read[uuid_offset:uuid_offset + 16]).decode(),
             playid=self.__unpack_short(bytes_read, offsets.playid), date=date,
-            # TODO re-add spy/sniper_username because that can be useful for general purpose applications
-            spy=name_extracts[0], sniper=name_extracts[1],
+            spy_displayname=name_extracts[0], sniper_displayname=name_extracts[1],
+            spy_username=name_extracts[2], sniper_username=name_extracts[3],
             result=self.__RESULT_MAP[self.__unpack_int(bytes_read, offsets.result)],
             venue=venue, variant=variant,
             game_type=self.__get_game_type(self.__unpack_int(bytes_read, offsets.setup)),
