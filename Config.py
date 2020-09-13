@@ -9,6 +9,7 @@ class Config:
         self.path = path
         self.verbose = load_logging
         self.__default = default_config
+        self.__saved[path] = True  # the config was just initialized, so there are no changes to be saved
         if path not in self.__configs:
             if os.path.exists(path):
                 try:
@@ -27,16 +28,16 @@ class Config:
                         if self.verbose:
                             print(f"+ added new property: '{key}': {default_config[key]}")
                         self.__configs[path][key] = default_config[key]
-                # for key in self.configs[path]:
+                        self.__saved[path] = False
+                # for key in self.__configs[path]:
                 #     if key not in default_config:
                 #         if self.verbose:
-                #             print(f"- removed property: '{key}': {self.configs[path][key]}")
-                #         del self.configs[path][key]
+                #             print(f"- removed property: '{key}': {self.__configs[path][key]}")
+                #         del self.__configs[path][key]
             else:
                 if self.verbose:
                     print("config not found, using default:", default_config)
                 self.__configs[path] = default_config
-        self.__saved[path] = True  # the config was just initialized, so there are no changes to be saved
 
     def save(self):
         if not self.__saved[self.path]:
@@ -70,12 +71,14 @@ class Config:
 
     def toggle(self, key):
         if key in self.__configs[self.path]:
-            val = self.__configs[self.path][key]
-            if type(val) == bool:
+            if type(val := self.__configs[self.path][key]) == bool:
                 val = not val
                 self.__configs[self.path][key] = val
                 self.__saved[self.path] = False
                 return val
+
+    def reset_property(self, key):
+        self.__configs[self.path][key] = self.__default[key]
 
     def reset_to_defaults(self):
         self.__configs[self.path] = self.__default
