@@ -131,6 +131,10 @@ class ReplayParser:
             return spy_display_name, sniper_display_name, spy_username, sniper_username
 
     __HEADER_DATA_MINIMUM_BYTES = 416
+    __HEADER_DATA_USERNAME_LIMIT = 33
+    __HEADER_DATA_DISPLAYNAME_LIMIT = 135
+    __HEADER_DATA_MAXIMUM_BYTES = __HEADER_DATA_MINIMUM_BYTES + 2 * (__HEADER_DATA_USERNAME_LIMIT +
+                                                                     __HEADER_DATA_DISPLAYNAME_LIMIT)
     __OFFSETS_DICT = {
         3: __ReplayVersionConstants(),
         4: __ReplayVersionConstants(
@@ -287,7 +291,8 @@ class ReplayParser:
 
     def parse(self, replay_file_path):
         with open(replay_file_path, "rb") as replay_file:
-            bytes_read = bytearray(replay_file.read(512))  # Again, thanks to Checker for a fantastic suggestion!
+            # Again, thanks to Checker for a fantastic suggestion!
+            bytes_read = bytearray(replay_file.read(self.__HEADER_DATA_MAXIMUM_BYTES))
 
         if len(bytes_read) < self.__HEADER_DATA_MINIMUM_BYTES:
             # raise Exception(f"A minimum of {self.__HEADER_DATA_MINIMUM_BYTES} bytes are required for replay parsing"
