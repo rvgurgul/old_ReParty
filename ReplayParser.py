@@ -220,7 +220,8 @@ class ReplayParser:
 
     def __init__(self):
         if self.__VENUE_MAP is None:
-            self.__OFFSETS_DICT[2] = self.__OFFSETS_DICT[3]  # v2 is nearly identical to v3 according to plastikqs!
+            self.__OFFSETS_DICT[2] = self.__OFFSETS_DICT[3]  
+            # v2 is nearly identical to v3 according to plastikqs!
 
             def endian_swap(value):
                 return unpack("<I", pack(">I", value))[0]
@@ -255,12 +256,17 @@ class ReplayParser:
                 0xf3e61461: "Modern"
             }
 
-    def __unpack_missions(self, sector, offset):
+    def __unpack_missions(self, sector, offset, container_type):
         data = self.__unpack_int(sector, offset)
-        missions = set()
-        for mission in self.__MISSION_OFFSETS:
-            if data & (1 << self.__MISSION_OFFSETS[mission]):
-                missions.add(mission)
+        missions = container_type()
+        if container_type == set:
+            for mission in self.__MISSION_OFFSETS:
+                if data & (1 << self.__MISSION_OFFSETS[mission]):
+                    missions.add(mission)
+        elif container_type == list:
+            for mission in self.__MISSION_OFFSETS:
+                if data & (1 << self.__MISSION_OFFSETS[mission]):
+                    missions.add(mission)
         return missions
 
     def __get_game_type(self, info):
@@ -289,7 +295,7 @@ class ReplayParser:
     def __unpack_short(self, sector, start):
         return unpack('H', self.__read_bytes(sector, start, 2))[0]
 
-    def parse(self, replay_file_path):
+    def parse(self, replay_file_path, mission_container=set):
         with open(replay_file_path, "rb") as replay_file:
             # Again, thanks to Checker for a fantastic suggestion!
             bytes_read = bytearray(replay_file.read(self.__HEADER_DATA_MAXIMUM_BYTES))
@@ -336,9 +342,9 @@ class ReplayParser:
             guests=self.__unpack_int(bytes_read, offsets.guests) if offsets.guests else None,
             clock=self.__unpack_int(bytes_read, offsets.clock) if offsets.clock else None,
             duration=int(self.__unpack_float(bytes_read, offsets.duration)),
-            selected_missions=self.__unpack_missions(bytes_read, offsets.missions_s),
-            picked_missions=self.__unpack_missions(bytes_read, offsets.missions_p),
-            completed_missions=self.__unpack_missions(bytes_read, offsets.missions_c)
+            selected_missions=self.__unpack_missions(bytes_read, offsets.missions_s, mission_container),
+            picked_missions=self.__unpack_missions(bytes_read, offsets.missions_p, mission_container),
+            completed_missions=self.__unpack_missions(bytes_read, offsets.missions_c, mission_container)
         )
 
     @staticmethod
