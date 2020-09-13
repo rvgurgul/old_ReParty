@@ -315,10 +315,8 @@ class ReplayParser:
 
         date = datetime.fromtimestamp(self.__unpack_int(bytes_read, offsets.timestamp))
         venue = self.__VENUE_MAP[self.__unpack_int(bytes_read, offsets.venue)]
-        if venue == 'Terrace':  # and (game_ver = self.__unpack_int(...) < 6117
-            game_ver = self.__unpack_int(bytes_read, offsets.spyparty_version)
-            if game_ver < 6117:  # Thanks checker!
-                venue = "Old Terrace"
+        if venue == 'Terrace' and self.__unpack_int(bytes_read, offsets.spyparty_version) < 6117:  # Thanks checker!
+            venue = "Old Terrace"
 
         variant = None
         if offsets.variant:
